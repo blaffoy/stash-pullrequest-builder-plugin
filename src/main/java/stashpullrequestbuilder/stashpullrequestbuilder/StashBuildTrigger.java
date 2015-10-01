@@ -36,6 +36,7 @@ public class StashBuildTrigger extends Trigger<AbstractProject<?, ?>> {
     private final boolean checkNotConflicted;
     private final boolean onlyBuildOnComment;
     private final boolean reportBuildStartedToStash;
+    private final boolean deleteBuildStartedToStash;
     private final boolean reportBuildStatusToStash;
 
     transient private StashPullRequestsBuilder stashPullRequestsBuilder;
@@ -59,6 +60,7 @@ public class StashBuildTrigger extends Trigger<AbstractProject<?, ?>> {
             boolean checkNotConflicted,
             boolean onlyBuildOnComment,
             boolean reportBuildStartedToStash,
+            boolean deleteBuildStartedToStash,
             boolean reportBuildStatusToStash,
             String ciBuildPhrases
             ) throws ANTLRException {
@@ -78,6 +80,7 @@ public class StashBuildTrigger extends Trigger<AbstractProject<?, ?>> {
         this.checkNotConflicted = checkNotConflicted;
         this.onlyBuildOnComment = onlyBuildOnComment;
         this.reportBuildStartedToStash = reportBuildStartedToStash;
+        this.deleteBuildStartedToStash = deleteBuildStartedToStash;
         this.reportBuildStatusToStash = reportBuildStatusToStash;
     }
 
@@ -128,6 +131,10 @@ public class StashBuildTrigger extends Trigger<AbstractProject<?, ?>> {
     public boolean reportBuildStartedToStash() {
         return reportBuildStartedToStash;
     }    
+
+    public boolean deleteBuildStartedToStash() {
+        return deleteBuildStartedToStash;
+    }
 
     public boolean reportBuildStatusToStash() {
         return reportBuildStatusToStash;
