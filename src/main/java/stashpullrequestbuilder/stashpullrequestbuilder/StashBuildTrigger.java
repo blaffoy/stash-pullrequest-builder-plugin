@@ -1,5 +1,7 @@
 package stashpullrequestbuilder.stashpullrequestbuilder;
 
+import stashpullrequestbuilder.stashpullrequestbuilder.stash.StashPullRequestBuildHistory;
+
 import antlr.ANTLRException;
 import hudson.Extension;
 import hudson.model.*;
@@ -39,6 +41,7 @@ public class StashBuildTrigger extends Trigger<AbstractProject<?, ?>> {
     private final boolean deleteBuildStartedToStash;
     private final boolean reportBuildStatusToStash;
 
+    public static final StashPullRequestBuildHistory buildHistory = new StashPullRequestBuildHistory();
     transient private StashPullRequestsBuilder stashPullRequestsBuilder;
 
     @Extension
@@ -130,7 +133,7 @@ public class StashBuildTrigger extends Trigger<AbstractProject<?, ?>> {
 
     public boolean reportBuildStartedToStash() {
         return reportBuildStartedToStash;
-    }    
+    }
 
     public boolean deleteBuildStartedToStash() {
         return deleteBuildStartedToStash;
@@ -146,7 +149,7 @@ public class StashBuildTrigger extends Trigger<AbstractProject<?, ?>> {
             this.stashPullRequestsBuilder = StashPullRequestsBuilder.getBuilder();
             this.stashPullRequestsBuilder.setProject(project);
             this.stashPullRequestsBuilder.setTrigger(this);
-            this.stashPullRequestsBuilder.setupBuilder();
+            this.stashPullRequestsBuilder.setupBuilder(this.buildHistory);
         } catch(IllegalStateException e) {
             logger.log(Level.SEVERE, "Can't start trigger", e);
             return;
@@ -174,14 +177,14 @@ public class StashBuildTrigger extends Trigger<AbstractProject<?, ?>> {
         values.put("destinationRepositoryName", new StringParameterValue("destinationRepositoryName", cause.getDestinationRepositoryName()));
         values.put("pullRequestTitle", new StringParameterValue("pullRequestTitle", cause.getPullRequestTitle()));
         values.put("sourceCommitHash", new StringParameterValue("sourceCommitHash", cause.getSourceCommitHash()));
-        
+
         Map<String, String> additionalParameters = cause.getAdditionalParameters();
         if(additionalParameters != null){
         	for(String parameter : additionalParameters.keySet()){
         		values.put(parameter, new StringParameterValue(parameter, additionalParameters.get(parameter)));
         	}
         }
-        
+
         return this.job.scheduleBuild2(0, cause, new ParametersAction(new ArrayList(values.values())));
     }
 

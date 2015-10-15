@@ -14,6 +14,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -43,15 +44,16 @@ public class StashRepository {
     private StashPullRequestsBuilder builder;
     private StashBuildTrigger trigger;
     private StashApiClient client;
-    private StashPullRequestBuildHistory buildHistory;
+    private final StashPullRequestBuildHistory buildHistory;
 
-    public StashRepository(String projectPath, StashPullRequestsBuilder builder) {
+    public StashRepository(String projectPath, StashPullRequestsBuilder builder,
+            StashPullRequestBuildHistory buildHistory) {
         this.projectPath = projectPath;
         this.builder = builder;
+        this.buildHistory = buildHistory;
     }
 
     public void init() {
-        buildHistory = new StashPullRequestBuildHistory();
         trigger = this.builder.getTrigger();
         client = new StashApiClient(
                 trigger.getStashHost(),
@@ -193,7 +195,7 @@ public class StashRepository {
     private boolean isBuildTarget(StashPullRequestResponseValue pullRequest) {
 
         boolean shouldBuild = true;
-        boolean forceBuild = false;
+        Integer triggerCommentId = -1;
 
         if (pullRequest.getState() != null && pullRequest.getState().equals("OPEN")) {
             if (isSkipBuild(pullRequest.getTitle())) {
@@ -262,25 +264,19 @@ public class StashRepository {
 
                     if (isPhrasesContain(content, this.trigger.getCiBuildPhrases())) {
                         shouldBuild = true;
-                        forceBuild = true;
+                        triggerCommentId = comment.getCommentId();
                         break;
                     }
                 }
             }
-            if( shouldBuild && ! forceBuild ) {
-                shouldBuild = ! buildHistory.hasBeenBuilt(sourceCommit, destinationCommit);
-                if( ! shouldBuild ) {
-                    logger.info("Matched " + sourceCommit + ":" + destinationCommit + " in history");
-                }
+            if(shouldBuild) {
+                shouldBuild = ! buildHistory.hasBeenBuilt(sourceCommit, destinationCommit, triggerCommentId);
+                logger.log(Level.INFO, "Matched {0}:{1}:{2} in history: ", new Object[]{sourceCommit, destinationCommit, triggerCommentId, shouldBuild});
             }
-            if( shouldBuild ) {
-                buildHistory.save(sourceCommit, destinationCommit);
+            if(shouldBuild) {
+                buildHistory.save(sourceCommit, destinationCommit, triggerCommentId);
             }
-            logger.info("Build history");
-            logger.info(buildHistory.toString());
-            logger.info("End build history");
         }
-        logger.info("shouldBuild: \"" + shouldBuild + "\"");
         return shouldBuild;
     }
 
