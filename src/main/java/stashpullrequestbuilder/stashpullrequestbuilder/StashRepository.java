@@ -5,6 +5,7 @@ import stashpullrequestbuilder.stashpullrequestbuilder.stash.StashPullRequestCom
 import stashpullrequestbuilder.stashpullrequestbuilder.stash.StashPullRequestMergableResponse;
 import stashpullrequestbuilder.stashpullrequestbuilder.stash.StashPullRequestResponseValue;
 import stashpullrequestbuilder.stashpullrequestbuilder.stash.StashPullRequestResponseValueRepository;
+import stashpullrequestbuilder.stashpullrequestbuilder.stash.StashPullRequestBuildHistory;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -42,6 +43,7 @@ public class StashRepository {
     private StashPullRequestsBuilder builder;
     private StashBuildTrigger trigger;
     private StashApiClient client;
+    private StashPullRequestBuildHistory buildHistory;
 
     public StashRepository(String projectPath, StashPullRequestsBuilder builder) {
         this.projectPath = projectPath;
@@ -49,6 +51,7 @@ public class StashRepository {
     }
 
     public void init() {
+        buildHistory = new StashPullRequestBuildHistory();
         trigger = this.builder.getTrigger();
         client = new StashApiClient(
                 trigger.getStashHost(),
@@ -190,6 +193,7 @@ public class StashRepository {
     private boolean isBuildTarget(StashPullRequestResponseValue pullRequest) {
 
         boolean shouldBuild = true;
+        boolean forceBuild = false;
 
         if (pullRequest.getState() != null && pullRequest.getState().equals("OPEN")) {
             if (isSkipBuild(pullRequest.getTitle())) {
@@ -248,7 +252,7 @@ public class StashRepository {
                             // if we're checking destination commits, and if this doesn't match, then move on.
                             if (this.trigger.getCheckDestinationCommit()
                                     && (!destinationCommitMatch.equalsIgnoreCase(destinationCommit))) {
-                            	continue;
+                                continue;
                             }
 
                             shouldBuild = false;
@@ -258,11 +262,25 @@ public class StashRepository {
 
                     if (isPhrasesContain(content, this.trigger.getCiBuildPhrases())) {
                         shouldBuild = true;
+                        forceBuild = true;
                         break;
                     }
                 }
             }
+            if( shouldBuild && ! forceBuild ) {
+                shouldBuild = ! buildHistory.hasBeenBuilt(sourceCommit, destinationCommit);
+                if( ! shouldBuild ) {
+                    logger.info("Matched " + sourceCommit + ":" + destinationCommit + " in history");
+                }
+            }
+            if( shouldBuild ) {
+                buildHistory.save(sourceCommit, destinationCommit);
+            }
+            logger.info("Build history");
+            logger.info(buildHistory.toString());
+            logger.info("End build history");
         }
+        logger.info("shouldBuild: \"" + shouldBuild + "\"");
         return shouldBuild;
     }
 
