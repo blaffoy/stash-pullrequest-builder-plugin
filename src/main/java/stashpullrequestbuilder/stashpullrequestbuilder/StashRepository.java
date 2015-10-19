@@ -99,7 +99,7 @@ public class StashRepository {
         }
         return null;
     }
-    
+
     public static Map<String, String> getParametersFromContent(String content){
         Map<String, String> result = new TreeMap<String, String>();
 		String lines[] = content.split("\\r?\\n|\\r");
@@ -109,10 +109,10 @@ public class StashRepository {
 				result.put(parameter.getKey(), parameter.getValue());
 			}
 		}
-        
+
         return result;
    }
-    
+
     public Map<String, String> getAdditionalParameters(StashPullRequestResponseValue pullRequest){
         StashPullRequestResponseValueRepository destination = pullRequest.getToRef();
         String owner = destination.getRepository().getProjectName();
@@ -125,7 +125,7 @@ public class StashRepository {
 //          Collections.reverse(comments);
 
             Map<String, String> result = new TreeMap<String, String>();
-            
+
             for (StashPullRequestComment comment : comments) {
                 String content = comment.getText();
                 if (content == null || content.isEmpty()) {
@@ -195,7 +195,6 @@ public class StashRepository {
     private boolean isBuildTarget(StashPullRequestResponseValue pullRequest) {
 
         boolean shouldBuild = true;
-        Integer triggerCommentId = -1;
 
         if (pullRequest.getState() != null && pullRequest.getState().equals("OPEN")) {
             if (isSkipBuild(pullRequest.getTitle())) {
@@ -210,6 +209,9 @@ public class StashRepository {
                 shouldBuild = false;
             }
 
+            boolean mergeHasBeenBuilt = false;
+            boolean commentHasBeenBuilt = false;
+            Integer triggerCommentId = -1;
             String sourceCommit = pullRequest.getFromRef().getLatestCommit();
 
             StashPullRequestResponseValueRepository destination = pullRequest.getToRef();
@@ -262,21 +264,35 @@ public class StashRepository {
                         }
                     }
 
+                    mergeHasBeenBuilt = buildHistory.mergeHasBeenBuilt(sourceCommit, destinationCommit);
+                    logger.log(Level.INFO, "Matched {0}:{1} in history: {2}", new Object[]{sourceCommit, destinationCommit, mergeHasBeenBuilt});
+
                     if (isPhrasesContain(content, this.trigger.getCiBuildPhrases())) {
                         shouldBuild = true;
                         triggerCommentId = comment.getCommentId();
+                        commentHasBeenBuilt = buildHistory.commentHasBeenBuilt(triggerCommentId);
+                        logger.log(Level.INFO, "Matched commentId {0} in history: {1}", new Object[]{triggerCommentId, commentHasBeenBuilt});
                         break;
                     }
                 }
             }
-            if(shouldBuild) {
-                shouldBuild = ! buildHistory.hasBeenBuilt(sourceCommit, destinationCommit, triggerCommentId);
-                logger.log(Level.INFO, "Matched {0}:{1}:{2} in history: ", new Object[]{sourceCommit, destinationCommit, triggerCommentId, shouldBuild});
+
+            if (shouldBuild) {
+                if (! commentHasBeenBuilt) {
+                    buildHistory.saveCommentTrigger(triggerCommentId);
+                } else {
+                    shouldBuild = false;
+                }
             }
-            if(shouldBuild) {
-                buildHistory.save(sourceCommit, destinationCommit, triggerCommentId);
+            if (shouldBuild) {
+                if (! mergeHasBeenBuilt) {
+                    buildHistory.saveMergeTrigger(sourceCommit, destinationCommit);
+                } else {
+                    shouldBuild = false;
+                }
             }
         }
+
         return shouldBuild;
     }
 

@@ -1,7 +1,7 @@
 package stashpullrequestbuilder.stashpullrequestbuilder.stash;
 
 import java.io.Serializable;
-import java.util.ArrayList;
+import java.util.HashSet;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -13,29 +13,27 @@ import java.util.logging.Logger;
 public class StashPullRequestBuildHistory implements Serializable {
     private static final Logger logger = Logger.getLogger(StashPullRequestBuildHistory.class.getName());
 
-    private final ArrayList<HistoryItem> history;
+    private final HashSet<Merge> mergeTriggerHistory;
 
-    private class HistoryItem {
+    private final HashSet<Integer> commentTriggerHistory;
+
+    private class Merge {
         public final String branch;
         public final String target;
-        public final Integer commentId;
 
-        public HistoryItem(String branch, String target, Integer commentId) {
+        public Merge(String branch, String target) {
             this.branch = branch;
             this.target = target;
-            this.commentId = commentId;
         }
 
         @Override
         public String toString() {
-            return "branch: \"" + branch + " ; target: \"" + target + "\"" +
-                    "commentId: \"" + commentId + "\"";
+            return "branch: \"" + branch + " ; target: \"" + target + "\"";
         }
 
-        public boolean equals(HistoryItem that) {
+        public boolean equals(Merge that) {
             boolean ret = this.branch.equals(that.branch) &&
-                    this.target.equals(that.target) &&
-                    this.commentId.equals(that.commentId);
+                    this.target.equals(that.target);
             logger.log(Level.INFO, "Matching {0} against {1}", new Object[]{this, that});
             logger.log(Level.INFO, "Match: {0}", ret);
             return ret;
@@ -44,41 +42,36 @@ public class StashPullRequestBuildHistory implements Serializable {
 
     public StashPullRequestBuildHistory() {
         logger.log(Level.INFO, "Setting up new Build History");
-        this.history = new ArrayList<HistoryItem>();
+        this.mergeTriggerHistory = new HashSet<Merge>();
+        this.commentTriggerHistory = new HashSet<Integer>();
     }
 
-    public boolean hasBeenBuilt(String branchSha, String targetSha,
-            Integer commentId) {
-        return getLastBuild(branchSha, targetSha, commentId) != null;
-    }
-
-    public void save(String branchSha, String targetSha, Integer commentId) {
-        history.add(new HistoryItem(branchSha, targetSha, commentId));
-    }
-
-    private HistoryItem getLastBuild(String branchSha, String targetSha,
-            Integer commentId) {
-        HistoryItem candidate = new HistoryItem(branchSha, targetSha, commentId);
-        try {
-            for(HistoryItem hi : history) {
-                if(hi.equals(candidate)) {
-                    return hi;
-                }
-            }
-
-            return null;
-        } catch(Exception ex) {
-            return null;
+    public void saveMergeTrigger(String branchSha, String targetSha) {
+        Merge m = new Merge(branchSha, targetSha);
+        if (mergeHasBeenBuilt(m)) {
+            logger.log(Level.SEVERE, "Merge trigger history already contains", m);
+        } else {
+            mergeTriggerHistory.add(m);
         }
     }
 
-    @Override
-    public String toString() {
-        StringBuilder sb = new StringBuilder();
-        for(HistoryItem h: history) {
-            sb.append(h.toString());
-        }
+    private boolean mergeHasBeenBuilt(Merge m) {
+        return mergeTriggerHistory.contains(m);
+    }
 
-        return sb.toString();
+    public boolean mergeHasBeenBuilt(String branchSha, String targetSha) {
+        return mergeTriggerHistory.contains(new Merge(branchSha, targetSha));
+    }
+
+    public void saveCommentTrigger(Integer commentId) {
+        if (commentHasBeenBuilt(commentId)) {
+            logger.log(Level.SEVERE, "Comment trigger history already contains", commentId);
+        } else {
+            commentTriggerHistory.add(commentId);
+        }
+    }
+
+    public boolean commentHasBeenBuilt(Integer commentId) {
+        return commentTriggerHistory.contains(commentId);
     }
 }
