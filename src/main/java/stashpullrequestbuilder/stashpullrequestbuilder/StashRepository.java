@@ -265,32 +265,46 @@ public class StashRepository {
                     }
 
                     mergeHasBeenBuilt = buildHistory.mergeHasBeenBuilt(sourceCommit, destinationCommit);
-                    logger.log(Level.INFO, "Matched {0}:{1} in history: {2}", new Object[]{sourceCommit, destinationCommit, mergeHasBeenBuilt});
 
                     if (isPhrasesContain(content, this.trigger.getCiBuildPhrases())) {
                         shouldBuild = true;
                         triggerCommentId = comment.getCommentId();
                         commentHasBeenBuilt = buildHistory.commentHasBeenBuilt(triggerCommentId);
-                        logger.log(Level.INFO, "Matched commentId {0} in history: {1}", new Object[]{triggerCommentId, commentHasBeenBuilt});
                         break;
                     }
                 }
             }
 
-            if (shouldBuild) {
+            logger.log(Level.INFO, "Before comment/merge checks. shouldBuild: {0}\nsourceCommit: {1}\ndestionCommit: {2}\ntriggerCommentId: {3}\ncommentHasBeenBuilt: {4}\nmergeHasBeenBuilt: {5}", new Object[]{shouldBuild, sourceCommit, destinationCommit, triggerCommentId, commentHasBeenBuilt, mergeHasBeenBuilt});
+            String bhs = buildHistory.toString();
+            logger.log(Level.INFO, "{0}", bhs);
+            if (shouldBuild && triggerCommentId != -1) {
                 if (! commentHasBeenBuilt) {
                     buildHistory.saveCommentTrigger(triggerCommentId);
+                    if (! mergeHasBeenBuilt) {
+                        buildHistory.saveMergeTrigger(sourceCommit, destinationCommit);
+                    }
                 } else {
+                    logger.log(Level.INFO, "Matched commentId {0} in history: {1}", new Object[]{triggerCommentId, commentHasBeenBuilt});
                     shouldBuild = false;
                 }
+            } else {
+                logger.log(Level.INFO, "No matching comment");
             }
-            if (shouldBuild) {
+
+            logger.log(Level.INFO, "After comment check, shouldBuild = {0}", shouldBuild);
+
+            /*
+            if (shouldBuild && triggerCommentId == -1) {
                 if (! mergeHasBeenBuilt) {
                     buildHistory.saveMergeTrigger(sourceCommit, destinationCommit);
                 } else {
+                    logger.log(Level.INFO, "Matched merge {0} -> {1} in history: {2}", new Object[]{sourceCommit, destinationCommit, mergeHasBeenBuilt});
                     shouldBuild = false;
                 }
             }
+            logger.log(Level.INFO, "After merge check, shouldBuild = {0}", shouldBuild);
+            */
         }
 
         return shouldBuild;
